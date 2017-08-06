@@ -18,11 +18,13 @@
                  [org.clojure/tools.cli "0.3.5"]
                  [org.clojure/tools.logging "0.4.0"]
                  [org.webjars.bower/tether "1.4.0"]
+                 [org.clojure/clojurescript "1.9.473"]
                  [org.webjars/bootstrap "4.0.0-alpha.5"]
                  [org.webjars/font-awesome "4.7.0"]
                  [org.webjars/jquery "3.2.1"]
                  [ring-webjars "0.2.0"]
                  [ring/ring-core "1.6.2"]
+                 [quil "2.6.0"]
                  [ring/ring-defaults "0.3.1"]
                  [selmer "1.11.0"]]
 
@@ -31,12 +33,31 @@
   :jvm-opts ["-server" "-Dconf=.lein-env"]
   :source-paths ["src/clj"]
   :test-paths ["test/clj"]
-  :resource-paths ["resources"]
+  :resource-paths ["resources" "target/cljsbuild"]
   :target-path "target/%s/"
   :main ^:skip-aot doclus.core
 
   :plugins [[lein-cprop "1.0.3"]
-            [lein-immutant "2.1.0"]]
+            [lein-immutant "2.1.0"]
+            [lein-cljsbuild "1.1.3"]]
+
+  :cljsbuild
+  {:builds 
+   {:app {:source-paths  ["src/cljs"] 
+          :compiler {;:main          (str project-ns ".app") 
+                     :asset-path    "/js/out" 
+                     :output-to     "target/cljsbuild/public/js/app.js" 
+                     :output-dir    "target/cljsbuild/public/js/out" 
+                     :optimizations :none 
+                     :main "doclus.core"
+                     :source-map    true 
+                     :pretty-print  true}} 
+    :min {:source-paths  ["src/cljs"] 
+          :compiler {:output-to     "target/cljsbuild/public/js/app.js" 
+                     :output-dir    "target/uberjar" 
+                     :externs       ["react/externs/react.js"] 
+                     :optimizations :advanced 
+                     :pretty-print  false}}}}
 
   :profiles
   {:uberjar {:omit-source true

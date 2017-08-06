@@ -35,8 +35,8 @@
 (defroutes home-routes
   (GET "/" [] (home-page))
   (GET "/about" [] (about-page))
-  (GET "/upload"  []
-               (layout/render "upload.html"))
+  (GET "/upload"  [] (layout/render "upload.html"))
+  (GET "/quil"  [] (layout/render "quil.html"))
 
   (POST "/upload"  [file]
     (upload-file resource-path file)
