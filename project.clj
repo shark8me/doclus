@@ -26,11 +26,21 @@
                  [ring/ring-core "1.6.2"]
                  [quil "2.6.0"]
                  [ring/ring-defaults "0.3.1"]
-                 [selmer "1.11.0"]]
+                 [selmer "1.11.0"]
+
+                 ;;word2vec
+                 [org.bridgei2i/word2vec "0.2.1"]
+                 [dl4clj "0.0.2"]
+                 [net.mikera/core.matrix "0.60.3"]
+
+                 ;;sql
+                 [postgresql "9.3-1102.jdbc41"]
+                 [org.clojure/java.jdbc "0.7.0"]
+                 ]
 
   :min-lein-version "2.0.0"
 
-  :jvm-opts ["-server" "-Dconf=.lein-env"]
+  :jvm-opts ["-server" "-Dconf=.lein-env" "-Xmx12g"]
   :source-paths ["src/clj"]
   :test-paths ["test/clj"]
   :resource-paths ["resources" "target/cljsbuild"]
