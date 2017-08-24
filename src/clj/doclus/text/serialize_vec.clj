@@ -5,42 +5,42 @@
             [clojure.java.jdbc :as jdbc]
             [clojure.core.matrix :as m]
             [clojure.core.matrix.linear :as lm]
+            [clojure.java.io :as io]
+            [think.tsne.core :refer :all]
             ))
 
 ;;serialize the word2vec to postgres
-
 (def db-spec {:dbname "postgres"
               :dbtype "postgres"
               :user "postgres"
               :password "postgres"})
 
-(def cnames (into [
-                   [:id :int "PRIMARY KEY"]
-                   [:name :text]]
-                  (for [i (range 300)]
-                    [(keyword (str "v" (str i))) :float])))
+(defn create-table
+  "create the table to store w2vec data "
+  []
+  (let [cnames (into [[:id :int "PRIMARY KEY"]
+                      [:name :text]]
+                     (for [i (range 300)]
+                       [(keyword (str "v" (str i))) :float]))
+        ct (jdbc/create-table-ddl :vectors2 cnames)]
+    (jdbc/db-do-commands db-spec [ct])))
 
-(def fruit-table-ddl3
-  (jdbc/create-table-ddl :vectors2 cnames))
+;;create index to decrease query time
 ;CREATE INDEX ON vectors2 (name);
-(try
-  (jdbc/db-do-commands db-spec [fruit-table-ddl3])
-  (catch Exception e
-    (clojure.stacktrace/print-cause-trace (.getNextException e))))
 
-;(jdbc/db-do-commands db-spec [ (jdbc/drop-table-ddl :vectors2)])
-(time (def w3 (wvs/load-google-model "/home/kiran/Downloads/GoogleNews-vectors-negative300.bin.gz" true)))
-(class w3)
-(count (get-word-vector w3 "india"))
-(def lut (.lookupTable w3))
+(defn drop-table
+  "drop w2vec table"
+  []
+  (jdbc/db-do-commands db-spec [ (jdbc/drop-table-ddl :vectors2)]))
 
-(def vocab (.getVocab lut))
-
-(def words (.words vocab))
-(count words)
+(defn load-wordvector
+  "returns the word-vector map"
+  []
+  (let [w3 (wvs/load-google-model "/home/kiran/Downloads/GoogleNews-vectors-negative300.bin.gz" true)]
+    (.words (.getVocab (.lookupTable w3)))))
 
 (defn insert-all-words
-  []
+  [w3 words]
   (let [iseq (->> (pmap (fn[w i]
                           (let [imap {:name w :id i}
                                       wv (get-word-vector w3 w)
@@ -56,8 +56,9 @@
                (jdbc/insert-multi! db-spec :vectors2 i))]
     ires))
 
-(time 
- (insert-all-words))
+(comment 
+  (time 
+   (insert-all-words)))
 
 ;;map 340 secs
 ;;for 10k words, partition 1000
@@ -69,20 +70,60 @@
   [row]
   {(:name row) (m/array (mapv row (mapv #(-> (str "v" %) keyword) (range 300))))})
 
+;;(def words (load-wordvector))
 (take 10 words)
+
+(defn get-wordvector
+  [word]
+  (jdbc/query db-spec ["SELECT * FROM vectors2 WHERE name = ?"  word ]
+              {:row-fn row-vec-fn :result-set-fn (partial reduce merge {})}))
+
+;;(get-wordvector "Gloria_Rubac")
+
+
+(defn get-wordvectors
+  [words]
+  (let [cw (count words)
+        w (str "(" (clojure.string/join "," (repeat cw "?" )) ")")
+        query (into [(str "SELECT * FROM vectors2 WHERE name in " w)] words)]
+    (jdbc/query db-spec
+                query 
+                {:row-fn row-vec-fn :result-set-fn (partial reduce merge {})})))
+
 (time 
- (def res (jdbc/query db-spec ["SELECT * FROM vectors2 WHERE name = ?" "Gloria_Rubac" ]
-                      {:row-fn row-vec-fn :result-set-fn (partial reduce merge {})}
-                      )))
-(count res)
-(time
- (def res (jdbc/query db-spec
-                      (into ["SELECT * FROM vectors2 WHERE name in (?,?,?,?,?,?,?,?,?,?)"] (take 10 words))
-                      {:row-fn row-vec-fn :result-set-fn (partial reduce merge {})})))
+ (get-wordvectors (take 10 words)))
 (time (mapv #(get-word-vector w3 %) (take 10 words)))
+
 (defn cosine-sim
   [v1 v2]
   (/ (m/dot v1 v2) (* (lm/norm v1) (lm/norm v2))))
 
-(cosine-sim [2 4 3 1 6] [3 5 1 2 5])
+;(cosine-sim [2 4 3 1 6] [3 5 1 2 5])
 
+;;stopwords
+(def stopwords 
+  (set (.split (slurp (io/resource "docs/stopwords.txt")) "\n" )))
+(stopwords "to")
+(stopwords "in")
+
+(defn get-words
+  [docsrc]
+  (->> (.split (slurp (io/resource docsrc)) "\n")
+       (mapcat #(.split % " "))
+       (map #(.toLowerCase %))
+       (remove #(stopwords %)) 
+       (map #(.replaceAll % "[^a-z]" ""))
+       (remove empty?)
+       set))
+
+(def g (->> (mapv get-wordvectors
+                  (partition 10 (get-words "docs/wirearticle.txt")))
+            (reduce merge)))
+
+(class g)
+(keys g)
+(-> g vals first class)
+(class (vals g))
+(def res (tsne (core-mat-to-double-doubles (vals g)) 2))
+(-> res first second)
+(-> res first count)

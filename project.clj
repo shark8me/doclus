@@ -36,6 +36,8 @@
                  ;;sql
                  [postgresql "9.3-1102.jdbc41"]
                  [org.clojure/java.jdbc "0.7.0"]
+                 ;;tsne
+                 [thinktopic/think.tsne "0.1.1"]
                  ]
 
   :min-lein-version "2.0.0"
